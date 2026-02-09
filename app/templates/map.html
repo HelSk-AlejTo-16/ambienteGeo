@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gasolineras Encontradas</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .back-btn {
+            display: inline-block;
+            background: white;
+            color: #667eea;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            margin-bottom: 20px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .error-box {
+            background: #fee;
+            border: 2px solid #fcc;
+            color: #c33;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .results-info {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .results-info h2 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        .results-info p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        #map {
+            width: 100%;
+            height: 500px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .stations-list {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .stations-list h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .station-item {
+            padding: 15px;
+            border-left: 4px solid #667eea;
+            background: #f9f9f9;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            transition: transform 0.2s;
+        }
+
+        .station-item:hover {
+            transform: translateX(5px);
+            background: #f0f0f0;
+        }
+
+        .station-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .station-address {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .station-coords {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⛽ Localizador de Gasolineras</h1>
+        <p>Encuentra gasolineras cerca de ti</p>
+    </div>
+
+    <div class="container">
+        <a href="/" class="back-btn">← Volver a buscar</a>
+
+        {% if error %}
+            <div class="error-box">
+                <h2>❌ No se encontraron gasolineras</h2>
+                <p>No se encontraron gasolineras en "{{ ciudad }}". Intenta con otra ciudad.</p>
+            </div>
+        {% endif %}
+
+        {% if gasolineras %}
+            <div class="results-info">
+                <h2>📍 Resultados en {{ ciudad }}</h2>
+                <p>Se encontraron {{ total }} gasolineras</p>
+            </div>
+
+            <div id="map"></div>
+
+            <div class="stations-list">
+                <h3>Lista de Gasolineras</h3>
+                {% for gasolinera in gasolineras %}
+                    <div class="station-item">
+                        <div class="station-name">⛽ Gasolinera #{{ loop.index }}</div>
+                        <div class="station-address">{{ gasolinera.direccion }}</div>
+                        <div class="station-coords">
+                            📍 Lat: {{ "%.6f"|format(gasolinera.lat) }}, 
+                            Lon: {{ "%.6f"|format(gasolinera.lon) }}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        {% if gasolineras %}
+        // Crear el mapa centrado
+        const map = L.map('map').setView([{{ centro_lat }}, {{ centro_lon }}], 13);
+
+        // Agregar capa de OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Icono personalizado para gasolineras
+        const gasIcon = L.divIcon({
+            html: '<div style="background: #667eea; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">⛽</div>',
+            className: 'custom-icon',
+            iconSize: [30, 30]
+        });
+
+        // Agregar marcadores para cada gasolinera
+        {% for gasolinera in gasolineras %}
+        L.marker([{{ gasolinera.lat }}, {{ gasolinera.lon }}], { icon: gasIcon })
+            .addTo(map)
+            .bindPopup(`
+                <b>⛽ Gasolinera #{{ loop.index }}</b><br>
+                <small>{{ gasolinera.direccion }}</small>
+            `);
+        {% endfor %}
+
+        // Ajustar vista para mostrar todos los marcadores
+        const bounds = L.latLngBounds([
+            {% for gasolinera in gasolineras %}
+            [{{ gasolinera.lat }}, {{ gasolinera.lon }}]{{ "," if not loop.last else "" }}
+            {% endfor %}
+        ]);
+        map.fitBounds(bounds, { padding: [50, 50] });
+        {% endif %}
+    </script>
+</body>
+</html>
